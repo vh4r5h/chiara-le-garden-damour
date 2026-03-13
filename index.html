@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Le Jardin de Chiara</title>
+    <style>
+        :root {
+            --bg-color: #ffffff;
+            --text-color: #1a1a1a;
+            --flower-filter: sepia(0%) grayscale(0%) brightness(1);
+            --pulse-speed: 3s;
+        }
+
+        * {
+            -webkit-tap-highlight-color: transparent;
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: env(safe-area-inset-top) 20px env(safe-area-inset-bottom);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            height: 100vh;
+            background: var(--bg-color);
+            color: var(--text-color);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            transition: background 3s ease, color 3s ease;
+            overflow: hidden;
+        }
+
+        #header {
+            margin-top: 40px;
+        }
+
+        h1 {
+            font-size: 1.2rem;
+            letter-spacing: 2px;
+            font-weight: 300;
+            text-transform: uppercase;
+        }
+
+        #flower-stage {
+            flex-grow: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+        }
+
+        /* The Frangipani SVG */
+        #frangipani {
+            width: 70vw;
+            max-width: 280px;
+            filter: var(--flower-filter);
+            transition: filter 2s ease-in-out;
+            animation: pulse var(--pulse-speed) infinite ease-in-out;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 0.9; }
+            50% { transform: scale(1.04); opacity: 1; }
+        }
+
+        #ui-bottom {
+            width: 100%;
+            padding-bottom: 60px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .status-msg {
+            font-size: 1.1rem;
+            min-height: 3rem;
+            margin-bottom: 20px;
+            padding: 0 20px;
+            line-height: 1.4;
+            font-style: italic;
+        }
+
+        button {
+            width: 80%;
+            max-width: 300px;
+            padding: 18px;
+            border-radius: 50px;
+            border: 1.5px solid var(--text-color);
+            background: transparent;
+            color: var(--text-color);
+            font-size: 1rem;
+            font-weight: 600;
+            letter-spacing: 1px;
+            transition: 0.2s;
+        }
+
+        button:active {
+            background: var(--text-color);
+            color: var(--bg-color);
+            transform: scale(0.95);
+        }
+
+        .last-seen {
+            margin-top: 20px;
+            font-size: 0.7rem;
+            opacity: 0.5;
+            text-transform: uppercase;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="header">
+        <h1>Chiara's Garden</h1>
+    </div>
+
+    <div id="flower-stage">
+        <svg id="frangipani" viewBox="0 0 100 100">
+            <g id="petals">
+                <path d="M50 15 C65 15 75 35 50 50 C25 35 35 15 50 15" fill="white" />
+                <path d="M85 50 C85 65 65 75 50 50 C65 25 85 35 85 50" fill="white" />
+                <path d="M50 85 C35 85 25 65 50 50 C75 65 65 85 50 85" fill="white" />
+                <path d="M15 50 C15 35 35 25 50 50 C35 75 15 65 15 50" fill="white" />
+                <path d="M72 28 C85 40 70 60 50 50 C30 60 15 40 28 28 C40 15 60 15 72 28" fill="white" />
+            </g>
+            <circle cx="50" cy="50" r="8" fill="#FFD700" />
+        </svg>
+    </div>
+
+    <div id="ui-bottom">
+        <div class="status-msg" id="msg">Chargement...</div>
+        <button onclick="water()">Donner de l'eau</button>
+        <div class="last-seen" id="timestamp"></div>
+    </div>
+
+    <script>
+        const msgElement = document.getElementById('msg');
+        const timeElement = document.getElementById('timestamp');
+        const root = document.documentElement;
+
+        const dialogue = {
+            happy: ["T'es là enfin.", "Je me sens mieux quand tu me regardes.", "Reste encore un peu ?", "On est bien là, tous les deux."],
+            thirsty: ["J'ai soif... t'as fait quoi aujourd'hui ?", "Tu m'as oublié ? Déjà ?", "C'est sec ici sans toi.", "T'as mieux à faire que de me voir ?"],
+            dead: ["Trop tard.", "Tu m'as laissé tomber.", "Je savais que tu partirais.", "Regarde ce que t'as fait."]
+        };
+
+        function updateGame() {
+            const lastWatered = localStorage.getItem('gardenDate');
+            const now = Date.now();
+
+            if (!lastWatered) {
+                localStorage.setItem('gardenDate', now);
+                msgElement.innerText = "Plante-moi, Chiara.";
+                return;
+            }
+
+            const diffHours = (now - lastWatered) / 3600000;
+
+            if (diffHours > 24) { // State: Dead
+                msgElement.innerText = dialogue.dead[Math.floor(Math.random() * dialogue.dead.length)];
+                root.style.setProperty('--bg-color', '#1a1a1a');
+                root.style.setProperty('--text-color', '#555');
+                root.style.setProperty('--flower-filter', 'grayscale(100%) brightness(0.3)');
+                root.style.setProperty('--pulse-speed', '0s'); // Heartbeat stops
+            } else if (diffHours > 12) { // State: Thirsty
+                msgElement.innerText = dialogue.thirsty[Math.floor(Math.random() * dialogue.thirsty.length)];
+                root.style.setProperty('--bg-color', '#dcdde1');
+                root.style.setProperty('--text-color', '#2f3640');
+                root.style.setProperty('--flower-filter', 'sepia(60%) brightness(0.7)');
+                root.style.setProperty('--pulse-speed', '6s'); // Slow heartbeat
+            } else { // State: Happy
+                msgElement.innerText = dialogue.happy[Math.floor(Math.random() * dialogue.happy.length)];
+                root.style.setProperty('--bg-color', '#ffffff');
+                root.style.setProperty('--text-color', '#1a1a1a');
+                root.style.setProperty('--flower-filter', 'sepia(0%) brightness(1)');
+                root.style.setProperty('--pulse-speed', '3s');
+            }
+
+            const date = new Date(parseInt(lastWatered));
+            timeElement.innerText = "Dernier soin : " + date.toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'});
+        }
+
+        function water() {
+            // Haptic vibration feedback (if supported)
+            if (window.navigator.vibrate) window.navigator.vibrate(50);
+            
+            localStorage.setItem('gardenDate', Date.now());
+            updateGame();
+        }
+
+        // Check for changes every minute
+        setInterval(updateGame, 60000);
+        updateGame();
+    </script>
+</body>
+</html>
