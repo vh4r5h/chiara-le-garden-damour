@@ -3,265 +3,232 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Le Jardin Éternel de Chiara</title>
+    <title>Le Jardin de Chiara</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/23.1.1/tween.umd.js"></script>
     <style>
-        :root { --accent: #ff4d4d; }
-        body { margin: 0; overflow: hidden; background: #050505; font-family: 'Helvetica Neue', sans-serif; }
+        body { margin: 0; overflow: hidden; background: #020202; font-family: 'Georgia', serif; }
+        canvas { display: block; }
         
-        #canvas-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
-        
-        #overlay {
+        #interface {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             pointer-events: none; display: flex; flex-direction: column;
-            justify-content: space-between; padding: 40px 20px; box-sizing: border-box;
-            z-index: 10;
+            justify-content: space-between; padding: env(safe-area-inset-top) 30px env(safe-area-inset-bottom);
+            box-sizing: border-box; z-index: 100;
         }
 
-        .ui-top { text-align: center; color: white; }
-        h1 { font-weight: 200; letter-spacing: 8px; text-transform: uppercase; margin: 0; font-size: 1rem; opacity: 0.7; }
+        .header { text-align: center; padding-top: 40px; }
+        .header h1 { color: #fff; font-weight: 100; letter-spacing: 12px; text-transform: uppercase; font-size: 0.8rem; opacity: 0.5; }
+
+        .dialogue-box { text-align: center; height: 100px; display: flex; align-items: center; justify-content: center; }
+        #text-evocative { 
+            color: #fff; font-size: 1.4rem; font-style: italic; 
+            text-shadow: 0 0 20px rgba(255,255,255,0.3);
+            transition: all 1s ease-in-out; opacity: 0;
+        }
+
+        .interaction-zone { 
+            display: flex; flex-direction: column; align-items: center; padding-bottom: 50px; 
+        }
         
-        .ui-bottom { text-align: center; }
-        #status-text { color: white; font-style: italic; font-size: 1.2rem; margin-bottom: 20px; transition: 0.5s; text-shadow: 0 0 10px rgba(0,0,0,0.5); }
-
-        /* The Watering Can Interaction Area */
-        #water-trigger {
-            pointer-events: auto; width: 80px; height: 80px;
-            background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.3);
-            border-radius: 50%; margin: 0 auto; display: flex; align-items: center;
-            justify-content: center; backdrop-filter: blur(10px); cursor: grab;
-            transition: transform 0.3s;
+        #heart-orb {
+            width: 90px; height: 90px; border-radius: 50%;
+            border: 1px solid rgba(255,77,77,0.4);
+            background: radial-gradient(circle, rgba(255,77,77,0.2) 0%, transparent 70%);
+            pointer-events: auto; cursor: pointer;
+            display: flex; align-items: center; justify-content: center;
+            box-shadow: 0 0 30px rgba(255,77,77,0.1);
+            transition: 0.4s;
         }
-        #water-trigger:active { cursor: grabbing; transform: scale(0.9); }
-        #water-trigger svg { width: 40px; fill: white; }
 
-        .stats { color: rgba(255,255,255,0.4); font-size: 0.7rem; letter-spacing: 2px; margin-top: 15px; }
+        #heart-orb:active { transform: scale(0.9); box-shadow: 0 0 50px rgba(255,77,77,0.5); }
 
-        #heart-rain-toggle { position: absolute; bottom: 20px; right: 20px; pointer-events: auto; color: white; opacity: 0.3; font-size: 0.6rem; border: 1px solid white; padding: 5px; cursor: pointer; }
+        .timer-warning {
+            margin-top: 20px; color: rgba(255,255,255,0.3);
+            font-size: 0.6rem; letter-spacing: 3px; text-transform: uppercase;
+        }
     </style>
 </head>
 <body>
 
-    <div id="canvas-container"></div>
-
-    <div id="overlay">
-        <div class="ui-top">
-            <h1>Le Jardin de Chiara</h1>
+    <div id="interface">
+        <div class="header"><h1>L'Attachement</h1></div>
+        
+        <div class="dialogue-box">
+            <div id="text-evocative">Chargement de ton jardin...</div>
         </div>
 
-        <div class="ui-bottom">
-            <div id="status-text">...</div>
-            <div id="water-trigger" id="watering-can">
-                <svg viewBox="0 0 24 24"><path d="M12,2L4.5,20.29L5.21,21L12,18L18.79,21L19.5,20.29L12,2Z"/></svg>
+        <div class="interaction-zone">
+            <div id="heart-orb" id="water-action">
+                <svg width="30" height="30" viewBox="0 0 24 24" fill="#ff4d4d"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
             </div>
-            <div class="stats" id="health-stat">ÉNERGIE: 100%</div>
+            <div class="timer-warning" id="death-clock">Vie fragile</div>
         </div>
     </div>
 
     <script>
-        /** * GLOBAL CONFIG & STATE
-         */
-        let scene, camera, renderer, flowers = [], heartSystem, clock;
-        let health = 100;
-        let isWatering = false;
-        const DECAY_RATE = 0.005; // Health drop per frame (~24h to 0)
+        let scene, camera, renderer, flowers = [], hearts, stems = [];
+        let health = 1.0; 
+        let isTouching = false;
         
-        const dialogue = {
-            happy: ["Tu m'as manqué.", "Regarde comme on est beaux.", "Ne pars plus jamais.", "Ton souffle est mon eau."],
-            thirsty: ["Je me fane sans toi.", "Il fait noir ici...", "Une goutte suffit.", "Reviens vers moi."],
-            dead: ["Le silence est total.", "Oubliée.", "Trop tard pour nous.", "Adieu, Chiara."]
+        const messages = {
+            bloom: ["Je t'aime.", "Merci d'être revenue.", "On est si beaux ensemble.", "Tout est parfait quand tu es là.", "Je ne respire que pour toi."],
+            wither: ["J'ai mal...", "Pourquoi tu m'oublies ?", "Tu me laisses mourir ?", "Reviens, Chiara.", "Il fait froid sans toi."],
+            gone: ["Trop tard.", "Tu as brisé notre lien.", "Je n'existe plus.", "Adieu."]
         };
 
         init();
         animate();
 
         function init() {
-            // Scene Setup
             scene = new THREE.Scene();
-            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-            camera.position.z = 5;
+            scene.fog = new THREE.FogExp2(0x000000, 0.1);
 
-            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 1.5, 6);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.setPixelRatio(window.devicePixelRatio);
-            document.getElementById('canvas-container').appendChild(renderer.domElement);
+            document.body.appendChild(renderer.domElement);
 
-            clock = new THREE.Clock();
+            // Lighting - Cinematic
+            const p1 = new THREE.PointLight(0xff4d4d, 10, 10);
+            p1.position.set(2, 5, 2);
+            scene.add(p1);
+            
+            const p2 = new THREE.PointLight(0x4d77ff, 5, 10);
+            p2.position.set(-2, -2, 2);
+            scene.add(p2);
 
-            // Lighting
-            const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
-            scene.add(ambientLight);
-            const pointLight = new THREE.PointLight(0xff4d4d, 2);
-            pointLight.position.set(2, 3, 4);
-            scene.add(pointLight);
-
-            // Create Flowers (Complex Geometry)
-            for(let i = 0; i < 5; i++) {
-                createFlower(i);
+            // Create Complex Flowers
+            for(let i = 0; i < 3; i++) {
+                createOrganicFlower(i);
             }
 
-            // Heart Rain System
-            createHeartRain();
+            // Procedural Heart Rain
+            const heartGeo = new THREE.BufferGeometry();
+            const count = 800;
+            const pos = new Float32Array(count * 3);
+            for(let i=0; i<count*3; i++) pos[i] = (Math.random()-0.5) * 15;
+            heartGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+            const heartMat = new THREE.PointsMaterial({ size: 0.05, color: 0xff3333, transparent: true });
+            hearts = new THREE.Points(heartGeo, heartMat);
+            scene.add(hearts);
 
-            // Interaction
-            const trigger = document.getElementById('water-trigger');
-            trigger.addEventListener('pointerdown', () => { isWatering = true; trigger.style.borderColor = "#ff4d4d"; });
-            window.addEventListener('pointerup', () => { isWatering = false; trigger.style.borderColor = "rgba(255,255,255,0.3)"; });
+            // Events
+            const orb = document.getElementById('heart-orb');
+            orb.addEventListener('pointerdown', () => isTouching = true);
+            window.addEventListener('pointerup', () => isTouching = false);
 
-            window.addEventListener('resize', onWindowResize);
             loadState();
         }
 
-        function createFlower(index) {
+        function createOrganicFlower(index) {
             const group = new THREE.Group();
             
-            // Stem
-            const stemGeom = new THREE.CylinderGeometry(0.05, 0.08, 3, 8);
-            const stemMat = new THREE.MeshStandardMaterial({ color: 0x2d5a27 });
-            const stem = new THREE.Mesh(stemGeom, stemMat);
-            stem.position.y = -1.5;
+            // Stem: Using a curve for realism
+            const curve = new THREE.CatmullRomCurve3([
+                new THREE.Vector3(0, -4, 0),
+                new THREE.Vector3(Math.random(), -2, Math.random()),
+                new THREE.Vector3(0, 0, 0)
+            ]);
+            const tubeGeo = new THREE.TubeGeometry(curve, 20, 0.06, 8, false);
+            const tubeMat = new THREE.MeshStandardMaterial({ color: 0x1a2e1a });
+            const stem = new THREE.Mesh(tubeGeo, tubeMat);
             group.add(stem);
 
-            // Petals (Frangipani style)
-            const petalGeom = new THREE.SphereGeometry(0.5, 32, 32);
-            petalGeom.scale(1, 0.2, 1.5);
+            // Petals: Organic "Frangipani" with complex geometry
+            const petalShape = new THREE.SphereGeometry(0.7, 32, 32);
+            petalShape.scale(1, 0.15, 1.8);
             
             for(let i = 0; i < 5; i++) {
                 const petalMat = new THREE.MeshStandardMaterial({ 
                     color: 0xffffff, 
-                    emissive: 0xfceabb, 
-                    emissiveIntensity: 0.2 
+                    roughness: 0.3, 
+                    metalness: 0.1,
+                    emissive: 0xff6666,
+                    emissiveIntensity: 0
                 });
-                const petal = new THREE.Mesh(petalGeom, petalMat);
+                const petal = new THREE.Mesh(petalShape, petalMat);
                 petal.rotation.y = (i * Math.PI * 2) / 5;
-                petal.rotation.x = 0.3;
+                petal.rotation.x = 0.4;
                 petal.position.y = 0.1;
                 group.add(petal);
             }
 
-            // Center
-            const centerGeom = new THREE.SphereGeometry(0.2, 16, 16);
-            const centerMat = new THREE.MeshStandardMaterial({ color: 0xffd700 });
-            const center = new THREE.Mesh(centerGeom, centerMat);
-            group.add(center);
-
-            group.position.x = (index - 2) * 1.8;
-            group.position.y = Math.sin(index) * 0.5;
-            group.rotation.z = (Math.random() - 0.5) * 0.5;
+            group.position.x = (index - 1) * 2.5;
+            group.position.y = -0.5;
+            group.rotation.y = Math.random() * Math.PI;
             
             flowers.push(group);
             scene.add(group);
         }
 
-        function createHeartRain() {
-            const geometry = new THREE.BufferGeometry();
-            const vertices = [];
-            for (let i = 0; i < 500; i++) {
-                vertices.push(Math.random() * 20 - 10, Math.random() * 20, Math.random() * 10 - 5);
-            }
-            geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
-            
-            const material = new THREE.PointsMaterial({
-                color: 0xff4d4d,
-                size: 0.15,
-                transparent: true,
-                opacity: 0.8,
-                map: createHeartTexture()
-            });
-
-            heartSystem = new THREE.Points(geometry, material);
-            scene.add(heartSystem);
-        }
-
-        function createHeartTexture() {
-            const canvas = document.createElement('canvas');
-            canvas.width = 64; canvas.height = 64;
-            const ctx = canvas.getContext('2d');
-            ctx.fillStyle = 'red';
-            ctx.beginPath();
-            ctx.moveTo(32, 48);
-            ctx.bezierCurveTo(32, 45, 12, 35, 12, 20);
-            ctx.bezierCurveTo(12, 10, 25, 10, 32, 20);
-            ctx.bezierCurveTo(39, 10, 52, 10, 52, 20);
-            ctx.bezierCurveTo(52, 35, 32, 45, 32, 48);
-            ctx.fill();
-            const tex = new THREE.CanvasTexture(canvas);
-            return tex;
-        }
-
         function loadState() {
-            const last = localStorage.getItem('garden_3d_time');
+            const last = localStorage.getItem('chiara_garden_v2');
             if (last) {
-                const hoursPassed = (Date.now() - parseInt(last)) / 3600000;
-                health = Math.max(0, 100 - (hoursPassed * 4)); 
+                const hours = (Date.now() - parseInt(last)) / 3600000;
+                health = Math.max(0, 1.0 - (hours / 24)); // Dies in 24 hours
             }
         }
 
-        function updateUI() {
-            const status = document.getElementById('status-text');
-            const healthEl = document.getElementById('health-stat');
+        function updateLogic() {
+            const txt = document.getElementById('text-evocative');
             
-            healthEl.innerText = `ÉNERGIE VÉGÉTALE : ${Math.floor(health)}%`;
-
-            if (health > 70) {
-                if(status.innerText !== dialogue.happy[0]) status.innerText = dialogue.happy[Math.floor(Math.random()*4)];
-                status.style.color = "#fff";
-            } else if (health > 1) {
-                status.innerText = dialogue.thirsty[0];
-                status.style.color = "#ff9f43";
-            } else {
-                status.innerText = dialogue.dead[0];
-                status.style.color = "#555";
+            if (isTouching && health < 1.0) {
+                health += 0.005;
+                localStorage.setItem('chiara_garden_v2', Date.now());
+            } else if (!isTouching) {
+                health -= 0.0001; // Constant decay
             }
-        }
 
-        function animate() {
-            requestAnimationFrame(animate);
-            const delta = clock.getElapsedTime();
-
-            // Health Logic
-            if (isWatering && health < 100) {
-                health += 0.5;
-                localStorage.setItem('garden_3d_time', Date.now());
-            } else {
-                health -= DECAY_RATE;
-            }
-            health = Math.max(0, health);
-
-            // Animate Flowers based on Health
-            flowers.forEach((f, i) => {
-                const scale = (health / 100) * (1 + Math.sin(delta + i) * 0.05);
-                f.scale.set(scale, scale, scale);
-                f.rotation.y += 0.01;
+            // Visual feedback of "Ugly/Wilting" vs "Beautiful/Realistic"
+            flowers.forEach((f, idx) => {
+                f.scale.setScalar(0.5 + (health * 0.8));
+                f.rotation.z = Math.sin(Date.now() * 0.001 + idx) * (0.2 * (1-health)); // Shake if dying
                 
-                // Color fading
                 f.children.forEach(child => {
-                    if(child.material) {
-                        child.material.opacity = health / 100;
-                        child.material.transparent = true;
+                    if (child.material) {
+                        // Color shifts from White/Pink to Bruised Purple/Grey
+                        child.material.color.lerpColors(new THREE.Color(0x333333), new THREE.Color(0xffffff), health);
+                        child.material.emissiveIntensity = health * 0.5;
                     }
                 });
             });
 
-            // Heart Rain Animation
-            const positions = heartSystem.geometry.attributes.position.array;
-            for (let i = 1; i < positions.length; i += 3) {
-                positions[i] -= isWatering ? 0.2 : 0.05; // Speed up when watering
-                if (positions[i] < -5) positions[i] = 10;
-            }
-            heartSystem.geometry.attributes.position.needsUpdate = true;
-            heartSystem.visible = health > 10;
+            // Text logic
+            txt.style.opacity = 1;
+            if (health > 0.8) txt.innerText = messages.bloom[Math.floor(Date.now()/5000 % messages.bloom.length)];
+            else if (health > 0.1) txt.innerText = messages.wither[Math.floor(Date.now()/5000 % messages.wither.length)];
+            else txt.innerText = messages.gone[0];
 
-            updateUI();
+            document.getElementById('death-clock').innerText = health > 0 ? `Lien vital : ${Math.floor(health*100)}%` : "DÉCONNECTÉ";
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            // Camera subtle breath
+            camera.position.y = 1.5 + Math.sin(Date.now() * 0.0005) * 0.2;
+            
+            // Hearts movement
+            const pos = hearts.geometry.attributes.position.array;
+            for(let i=1; i<pos.length; i+=3) {
+                pos[i] -= 0.02 * (health + 0.1); 
+                if(pos[i] < -5) pos[i] = 10;
+            }
+            hearts.geometry.attributes.position.needsUpdate = true;
+            hearts.material.opacity = health;
+
+            updateLogic();
             renderer.render(scene, camera);
         }
 
-        function onWindowResize() {
+        window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
-        }
+        });
     </script>
 </body>
 </html>
