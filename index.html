@@ -3,198 +3,265 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>Le Jardin de Chiara</title>
+    <title>Le Jardin Éternel de Chiara</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tween.js/23.1.1/tween.umd.js"></script>
     <style>
-        :root {
-            --bg-color: #ffffff;
-            --text-color: #1a1a1a;
-            --flower-filter: sepia(0%) grayscale(0%) brightness(1);
-            --pulse-speed: 3s;
+        :root { --accent: #ff4d4d; }
+        body { margin: 0; overflow: hidden; background: #050505; font-family: 'Helvetica Neue', sans-serif; }
+        
+        #canvas-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; }
+        
+        #overlay {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none; display: flex; flex-direction: column;
+            justify-content: space-between; padding: 40px 20px; box-sizing: border-box;
+            z-index: 10;
         }
 
-        * {
-            -webkit-tap-highlight-color: transparent;
-            box-sizing: border-box;
-        }
+        .ui-top { text-align: center; color: white; }
+        h1 { font-weight: 200; letter-spacing: 8px; text-transform: uppercase; margin: 0; font-size: 1rem; opacity: 0.7; }
+        
+        .ui-bottom { text-align: center; }
+        #status-text { color: white; font-style: italic; font-size: 1.2rem; margin-bottom: 20px; transition: 0.5s; text-shadow: 0 0 10px rgba(0,0,0,0.5); }
 
-        body {
-            margin: 0;
-            padding: env(safe-area-inset-top) 20px env(safe-area-inset-bottom);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: space-between;
-            height: 100vh;
-            background: var(--bg-color);
-            color: var(--text-color);
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            transition: background 3s ease, color 3s ease;
-            overflow: hidden;
+        /* The Watering Can Interaction Area */
+        #water-trigger {
+            pointer-events: auto; width: 80px; height: 80px;
+            background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.3);
+            border-radius: 50%; margin: 0 auto; display: flex; align-items: center;
+            justify-content: center; backdrop-filter: blur(10px); cursor: grab;
+            transition: transform 0.3s;
         }
+        #water-trigger:active { cursor: grabbing; transform: scale(0.9); }
+        #water-trigger svg { width: 40px; fill: white; }
 
-        #header {
-            margin-top: 40px;
-        }
+        .stats { color: rgba(255,255,255,0.4); font-size: 0.7rem; letter-spacing: 2px; margin-top: 15px; }
 
-        h1 {
-            font-size: 1.2rem;
-            letter-spacing: 2px;
-            font-weight: 300;
-            text-transform: uppercase;
-        }
-
-        #flower-stage {
-            flex-grow: 1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 100%;
-        }
-
-        /* The Frangipani SVG */
-        #frangipani {
-            width: 70vw;
-            max-width: 280px;
-            filter: var(--flower-filter);
-            transition: filter 2s ease-in-out;
-            animation: pulse var(--pulse-speed) infinite ease-in-out;
-        }
-
-        @keyframes pulse {
-            0%, 100% { transform: scale(1); opacity: 0.9; }
-            50% { transform: scale(1.04); opacity: 1; }
-        }
-
-        #ui-bottom {
-            width: 100%;
-            padding-bottom: 60px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-
-        .status-msg {
-            font-size: 1.1rem;
-            min-height: 3rem;
-            margin-bottom: 20px;
-            padding: 0 20px;
-            line-height: 1.4;
-            font-style: italic;
-        }
-
-        button {
-            width: 80%;
-            max-width: 300px;
-            padding: 18px;
-            border-radius: 50px;
-            border: 1.5px solid var(--text-color);
-            background: transparent;
-            color: var(--text-color);
-            font-size: 1rem;
-            font-weight: 600;
-            letter-spacing: 1px;
-            transition: 0.2s;
-        }
-
-        button:active {
-            background: var(--text-color);
-            color: var(--bg-color);
-            transform: scale(0.95);
-        }
-
-        .last-seen {
-            margin-top: 20px;
-            font-size: 0.7rem;
-            opacity: 0.5;
-            text-transform: uppercase;
-        }
+        #heart-rain-toggle { position: absolute; bottom: 20px; right: 20px; pointer-events: auto; color: white; opacity: 0.3; font-size: 0.6rem; border: 1px solid white; padding: 5px; cursor: pointer; }
     </style>
 </head>
 <body>
 
-    <div id="header">
-        <h1>Chiara's Garden</h1>
-    </div>
+    <div id="canvas-container"></div>
 
-    <div id="flower-stage">
-        <svg id="frangipani" viewBox="0 0 100 100">
-            <g id="petals">
-                <path d="M50 15 C65 15 75 35 50 50 C25 35 35 15 50 15" fill="white" />
-                <path d="M85 50 C85 65 65 75 50 50 C65 25 85 35 85 50" fill="white" />
-                <path d="M50 85 C35 85 25 65 50 50 C75 65 65 85 50 85" fill="white" />
-                <path d="M15 50 C15 35 35 25 50 50 C35 75 15 65 15 50" fill="white" />
-                <path d="M72 28 C85 40 70 60 50 50 C30 60 15 40 28 28 C40 15 60 15 72 28" fill="white" />
-            </g>
-            <circle cx="50" cy="50" r="8" fill="#FFD700" />
-        </svg>
-    </div>
+    <div id="overlay">
+        <div class="ui-top">
+            <h1>Le Jardin de Chiara</h1>
+        </div>
 
-    <div id="ui-bottom">
-        <div class="status-msg" id="msg">Chargement...</div>
-        <button onclick="water()">Donner de l'eau</button>
-        <div class="last-seen" id="timestamp"></div>
+        <div class="ui-bottom">
+            <div id="status-text">...</div>
+            <div id="water-trigger" id="watering-can">
+                <svg viewBox="0 0 24 24"><path d="M12,2L4.5,20.29L5.21,21L12,18L18.79,21L19.5,20.29L12,2Z"/></svg>
+            </div>
+            <div class="stats" id="health-stat">ÉNERGIE: 100%</div>
+        </div>
     </div>
 
     <script>
-        const msgElement = document.getElementById('msg');
-        const timeElement = document.getElementById('timestamp');
-        const root = document.documentElement;
-
+        /** * GLOBAL CONFIG & STATE
+         */
+        let scene, camera, renderer, flowers = [], heartSystem, clock;
+        let health = 100;
+        let isWatering = false;
+        const DECAY_RATE = 0.005; // Health drop per frame (~24h to 0)
+        
         const dialogue = {
-            happy: ["T'es là enfin.", "Je me sens mieux quand tu me regardes.", "Reste encore un peu ?", "On est bien là, tous les deux."],
-            thirsty: ["J'ai soif... t'as fait quoi aujourd'hui ?", "Tu m'as oublié ? Déjà ?", "C'est sec ici sans toi.", "T'as mieux à faire que de me voir ?"],
-            dead: ["Trop tard.", "Tu m'as laissé tomber.", "Je savais que tu partirais.", "Regarde ce que t'as fait."]
+            happy: ["Tu m'as manqué.", "Regarde comme on est beaux.", "Ne pars plus jamais.", "Ton souffle est mon eau."],
+            thirsty: ["Je me fane sans toi.", "Il fait noir ici...", "Une goutte suffit.", "Reviens vers moi."],
+            dead: ["Le silence est total.", "Oubliée.", "Trop tard pour nous.", "Adieu, Chiara."]
         };
 
-        function updateGame() {
-            const lastWatered = localStorage.getItem('gardenDate');
-            const now = Date.now();
+        init();
+        animate();
 
-            if (!lastWatered) {
-                localStorage.setItem('gardenDate', now);
-                msgElement.innerText = "Plante-moi, Chiara.";
-                return;
+        function init() {
+            // Scene Setup
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.z = 5;
+
+            renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+            clock = new THREE.Clock();
+
+            // Lighting
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+            scene.add(ambientLight);
+            const pointLight = new THREE.PointLight(0xff4d4d, 2);
+            pointLight.position.set(2, 3, 4);
+            scene.add(pointLight);
+
+            // Create Flowers (Complex Geometry)
+            for(let i = 0; i < 5; i++) {
+                createFlower(i);
             }
 
-            const diffHours = (now - lastWatered) / 3600000;
+            // Heart Rain System
+            createHeartRain();
 
-            if (diffHours > 24) { // State: Dead
-                msgElement.innerText = dialogue.dead[Math.floor(Math.random() * dialogue.dead.length)];
-                root.style.setProperty('--bg-color', '#1a1a1a');
-                root.style.setProperty('--text-color', '#555');
-                root.style.setProperty('--flower-filter', 'grayscale(100%) brightness(0.3)');
-                root.style.setProperty('--pulse-speed', '0s'); // Heartbeat stops
-            } else if (diffHours > 12) { // State: Thirsty
-                msgElement.innerText = dialogue.thirsty[Math.floor(Math.random() * dialogue.thirsty.length)];
-                root.style.setProperty('--bg-color', '#dcdde1');
-                root.style.setProperty('--text-color', '#2f3640');
-                root.style.setProperty('--flower-filter', 'sepia(60%) brightness(0.7)');
-                root.style.setProperty('--pulse-speed', '6s'); // Slow heartbeat
-            } else { // State: Happy
-                msgElement.innerText = dialogue.happy[Math.floor(Math.random() * dialogue.happy.length)];
-                root.style.setProperty('--bg-color', '#ffffff');
-                root.style.setProperty('--text-color', '#1a1a1a');
-                root.style.setProperty('--flower-filter', 'sepia(0%) brightness(1)');
-                root.style.setProperty('--pulse-speed', '3s');
-            }
+            // Interaction
+            const trigger = document.getElementById('water-trigger');
+            trigger.addEventListener('pointerdown', () => { isWatering = true; trigger.style.borderColor = "#ff4d4d"; });
+            window.addEventListener('pointerup', () => { isWatering = false; trigger.style.borderColor = "rgba(255,255,255,0.3)"; });
 
-            const date = new Date(parseInt(lastWatered));
-            timeElement.innerText = "Dernier soin : " + date.toLocaleTimeString('fr-FR', {hour: '2-digit', minute:'2-digit'});
+            window.addEventListener('resize', onWindowResize);
+            loadState();
         }
 
-        function water() {
-            // Haptic vibration feedback (if supported)
-            if (window.navigator.vibrate) window.navigator.vibrate(50);
+        function createFlower(index) {
+            const group = new THREE.Group();
             
-            localStorage.setItem('gardenDate', Date.now());
-            updateGame();
+            // Stem
+            const stemGeom = new THREE.CylinderGeometry(0.05, 0.08, 3, 8);
+            const stemMat = new THREE.MeshStandardMaterial({ color: 0x2d5a27 });
+            const stem = new THREE.Mesh(stemGeom, stemMat);
+            stem.position.y = -1.5;
+            group.add(stem);
+
+            // Petals (Frangipani style)
+            const petalGeom = new THREE.SphereGeometry(0.5, 32, 32);
+            petalGeom.scale(1, 0.2, 1.5);
+            
+            for(let i = 0; i < 5; i++) {
+                const petalMat = new THREE.MeshStandardMaterial({ 
+                    color: 0xffffff, 
+                    emissive: 0xfceabb, 
+                    emissiveIntensity: 0.2 
+                });
+                const petal = new THREE.Mesh(petalGeom, petalMat);
+                petal.rotation.y = (i * Math.PI * 2) / 5;
+                petal.rotation.x = 0.3;
+                petal.position.y = 0.1;
+                group.add(petal);
+            }
+
+            // Center
+            const centerGeom = new THREE.SphereGeometry(0.2, 16, 16);
+            const centerMat = new THREE.MeshStandardMaterial({ color: 0xffd700 });
+            const center = new THREE.Mesh(centerGeom, centerMat);
+            group.add(center);
+
+            group.position.x = (index - 2) * 1.8;
+            group.position.y = Math.sin(index) * 0.5;
+            group.rotation.z = (Math.random() - 0.5) * 0.5;
+            
+            flowers.push(group);
+            scene.add(group);
         }
 
-        // Check for changes every minute
-        setInterval(updateGame, 60000);
-        updateGame();
+        function createHeartRain() {
+            const geometry = new THREE.BufferGeometry();
+            const vertices = [];
+            for (let i = 0; i < 500; i++) {
+                vertices.push(Math.random() * 20 - 10, Math.random() * 20, Math.random() * 10 - 5);
+            }
+            geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+            
+            const material = new THREE.PointsMaterial({
+                color: 0xff4d4d,
+                size: 0.15,
+                transparent: true,
+                opacity: 0.8,
+                map: createHeartTexture()
+            });
+
+            heartSystem = new THREE.Points(geometry, material);
+            scene.add(heartSystem);
+        }
+
+        function createHeartTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 64; canvas.height = 64;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = 'red';
+            ctx.beginPath();
+            ctx.moveTo(32, 48);
+            ctx.bezierCurveTo(32, 45, 12, 35, 12, 20);
+            ctx.bezierCurveTo(12, 10, 25, 10, 32, 20);
+            ctx.bezierCurveTo(39, 10, 52, 10, 52, 20);
+            ctx.bezierCurveTo(52, 35, 32, 45, 32, 48);
+            ctx.fill();
+            const tex = new THREE.CanvasTexture(canvas);
+            return tex;
+        }
+
+        function loadState() {
+            const last = localStorage.getItem('garden_3d_time');
+            if (last) {
+                const hoursPassed = (Date.now() - parseInt(last)) / 3600000;
+                health = Math.max(0, 100 - (hoursPassed * 4)); 
+            }
+        }
+
+        function updateUI() {
+            const status = document.getElementById('status-text');
+            const healthEl = document.getElementById('health-stat');
+            
+            healthEl.innerText = `ÉNERGIE VÉGÉTALE : ${Math.floor(health)}%`;
+
+            if (health > 70) {
+                if(status.innerText !== dialogue.happy[0]) status.innerText = dialogue.happy[Math.floor(Math.random()*4)];
+                status.style.color = "#fff";
+            } else if (health > 1) {
+                status.innerText = dialogue.thirsty[0];
+                status.style.color = "#ff9f43";
+            } else {
+                status.innerText = dialogue.dead[0];
+                status.style.color = "#555";
+            }
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            const delta = clock.getElapsedTime();
+
+            // Health Logic
+            if (isWatering && health < 100) {
+                health += 0.5;
+                localStorage.setItem('garden_3d_time', Date.now());
+            } else {
+                health -= DECAY_RATE;
+            }
+            health = Math.max(0, health);
+
+            // Animate Flowers based on Health
+            flowers.forEach((f, i) => {
+                const scale = (health / 100) * (1 + Math.sin(delta + i) * 0.05);
+                f.scale.set(scale, scale, scale);
+                f.rotation.y += 0.01;
+                
+                // Color fading
+                f.children.forEach(child => {
+                    if(child.material) {
+                        child.material.opacity = health / 100;
+                        child.material.transparent = true;
+                    }
+                });
+            });
+
+            // Heart Rain Animation
+            const positions = heartSystem.geometry.attributes.position.array;
+            for (let i = 1; i < positions.length; i += 3) {
+                positions[i] -= isWatering ? 0.2 : 0.05; // Speed up when watering
+                if (positions[i] < -5) positions[i] = 10;
+            }
+            heartSystem.geometry.attributes.position.needsUpdate = true;
+            heartSystem.visible = health > 10;
+
+            updateUI();
+            renderer.render(scene, camera);
+        }
+
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        }
     </script>
 </body>
 </html>
